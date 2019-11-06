@@ -112,14 +112,10 @@ ScriptAlias /Squid/cgi-bin/cachemgr.cgi %{_libdir}/squid/cachemgr.cgi
  # Require host example.com
 </Location>" > $RPM_BUILD_ROOT/squid.httpd.tmp
 
-mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d
-mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig
-mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/pam.d
-mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/httpd/conf.d/
-mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/NetworkManager/dispatcher.d
-mkdir -p $RPM_BUILD_ROOT%{_unitdir}
-mkdir -p $RPM_BUILD_ROOT%{_libexecdir}/squid
-mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/rc.d/init.d
+mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig \
+         $RPM_BUILD_ROOT%{_sysconfdir}/pam.d $RPM_BUILD_ROOT%{_sysconfdir}/httpd/conf.d/ \
+         $RPM_BUILD_ROOT%{_sysconfdir}/NetworkManager/dispatcher.d $RPM_BUILD_ROOT%{_unitdir} \
+         $RPM_BUILD_ROOT%{_libexecdir}/squid $RPM_BUILD_ROOT%{_sysconfdir}/rc.d/init.d
 install -m 644 %{SOURCE2} $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/squid
 install -m 644 %{SOURCE3} $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig/squid
 install -m 644 %{SOURCE4} $RPM_BUILD_ROOT%{_sysconfdir}/pam.d/squid
@@ -127,9 +123,8 @@ install -m 644 %{SOURCE6} $RPM_BUILD_ROOT%{_unitdir}
 install -m 755 %{SOURCE7} $RPM_BUILD_ROOT%{_libexecdir}/squid
 install -m 644 $RPM_BUILD_ROOT/squid.httpd.tmp $RPM_BUILD_ROOT%{_sysconfdir}/httpd/conf.d/squid.conf
 install -m 644 %{SOURCE5} $RPM_BUILD_ROOT%{_sysconfdir}/NetworkManager/dispatcher.d/20-squid
-mkdir -p $RPM_BUILD_ROOT%{_localstatedir}/log/squid
-mkdir -p $RPM_BUILD_ROOT%{_localstatedir}/spool/squid
-mkdir -p $RPM_BUILD_ROOT%{_localstatedir}/run/squid
+mkdir -p $RPM_BUILD_ROOT%{_localstatedir}/log/squid $RPM_BUILD_ROOT%{_localstatedir}/spool/squid \
+         $RPM_BUILD_ROOT%{_localstatedir}/run/squid
 chmod 644 contrib/url-normalizer.pl contrib/user-agents.pl
 iconv -f ISO88591 -t UTF8 ChangeLog -o ChangeLog.tmp
 mv -f ChangeLog.tmp ChangeLog
