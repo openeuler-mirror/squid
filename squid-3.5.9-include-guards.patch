@@ -25,8 +25,8 @@ message:
 # 
 # Begin patch
 === modified file 'compat/os/linux.h'
---- compat/os/linux.h	2015-01-13 07:25:36 +0000
-+++ compat/os/linux.h	2015-09-24 13:05:37 +0000
+--- a/compat/os/linux.h	2015-01-13 07:25:36 +0000
++++ b/compat/os/linux.h	2015-09-24 13:05:37 +0000
 @@ -30,6 +30,21 @@
  #endif
  
@@ -68,8 +68,8 @@ message:
 # 
 # Begin patch
 === modified file 'compat/os/linux.h'
---- compat/os/linux.h	2015-01-13 07:25:36 +0000
-+++ compat/os/linux.h	2015-09-24 13:05:37 +0000
+--- a/compat/os/linux.h	2015-01-13 07:25:36 +0000
++++ b/compat/os/linux.h	2015-09-24 13:05:37 +0000
 @@ -30,6 +30,21 @@
  #endif
  

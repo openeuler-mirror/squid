@@ -1,0 +1,25 @@
+From e10887e67fe84f52fa28d8c9b9e3d91e118fee3c Mon Sep 17 00:00:00 2001
+From: Vadim Salavatov <xremmargorpx@gmail.com>
+Date: Tue, 6 Aug 2019 23:11:36 +0000
+Subject: [PATCH] Bug 4978: eCAP crash after using MyHost().newRequest() (#449)
+
+Since commit 8babada, Squid was using a c_str() result after its
+std::string toString() source went out of scope.
+---
+ src/adaptation/ecap/MessageRep.cc | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/src/adaptation/ecap/MessageRep.cc b/src/adaptation/ecap/MessageRep.cc
+index 96af88c89b..039f9e1ef4 100644
+--- a/src/adaptation/ecap/MessageRep.cc
++++ b/src/adaptation/ecap/MessageRep.cc
+@@ -200,8 +200,7 @@ Adaptation::Ecap::RequestLineRep::uri(const Area &aUri)
+ {
+     // TODO: if method is not set, AnyP::Uri::parse will assume it is not connect;
+     // Can we change AnyP::Uri::parse API to remove the method parameter?
+-    const char *buf = aUri.toString().c_str();
+-    const bool ok = theMessage.url.parse(theMessage.method, buf);
++    const auto ok = theMessage.url.parse(theMessage.method, aUri.toString().c_str());
+     Must(ok);
+ }
+ 

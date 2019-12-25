@@ -2,7 +2,7 @@
 
 Name:     squid
 Version:  4.2
-Release:  3
+Release:  4
 Summary:  The Squid proxy caching server
 Epoch:    7
 License:  GPLv2+ and (LGPLv2+ and MIT and BSD and Public Domain)
@@ -28,6 +28,12 @@ Patch6001: CVE-2019-12527.patch
 Patch6002: CVE-2019-12529.patch
 Patch6003: CVE-2019-12854.patch
 Patch6004: CVE-2019-13345.patch
+Patch6005: CVE-2019-18677.patch
+Patch6006: eCAP-crash-after-using-MyHost.newRequest.patch
+Patch6007: Fix-netdb-exchange-with-a-TLS-cache_peer.patch
+Patch6008: CVE-2019-12523_CVE-2019-18676.patch
+Patch6009: CVE-2019-12526.patch
+Patch6010: CVE-2019-18678_CVE-2019-18679.patch
 
 Buildroot: %{_tmppath}/squid-4.2-2-root-%(%{__id_u} -n)
 Requires: bash >= 2.0
@@ -46,18 +52,7 @@ Squid is a high-performance proxy caching server. It handles all requests in a s
 non-blocking, I/O-driven process and keeps meta data and implements negative caching of failed requests.
 
 %prep
-%setup -q
-%patch0 -p1 -b .config
-%patch1 -p1 -b .location
-%patch2 -p1 -b .perlpath
-%patch3 -p0 -b .include-guards
-%patch4 -p1 -b .large_acl
-
-%patch6000 -p1
-%patch6001 -p1
-%patch6002 -p1
-%patch6003 -p1
-%patch6004 -p1
+%autosetup -p1
 
 %build
 autoconf
@@ -217,6 +212,12 @@ fi
     chgrp squid /var/cache/samba/winbindd_privileged >/dev/null 2>&1 || :
 
 %changelog
+* Fri Dec 20 2019  openEuler Buildteam <buildteam@openeuler.org>- 4.2-4
+- Type:bugfix
+- ID:
+- SUG:restart
+- DESC:fix bugs
+
 * Wed Sep 25 2019 majun<majun65@huawei.com> - 4.2-3
 - Type:cves
 - ID:CVE-2019-12525 CVE-2019-12527 CVE-2019-12529 CVE-2019-12854 CVE-2019-13345
