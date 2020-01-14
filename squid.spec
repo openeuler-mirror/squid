@@ -1,14 +1,14 @@
 %define __perl_requires %{SOURCE8}
 
 Name:     squid
-Version:  4.2
-Release:  4
+Version:  4.9
+Release:  1
 Summary:  The Squid proxy caching server
 Epoch:    7
 License:  GPLv2+ and (LGPLv2+ and MIT and BSD and Public Domain)
 URL:      http://www.squid-cache.org
-Source0:  http://www.squid-cache.org/Versions/v4/squid-4.2.tar.xz
-Source1:  http://www.squid-cache.org/Versions/v4/squid-4.2.tar.xz.asc
+Source0:  http://www.squid-cache.org/Versions/v4/squid-4.9.tar.xz
+Source1:  http://www.squid-cache.org/Versions/v4/squid-4.9.tar.xz.asc
 Source2:  squid.logrotate
 Source3:  squid.sysconfig
 Source4:  squid.pam
@@ -23,19 +23,7 @@ Patch2: squid-3.0.STABLE1-perlpath.patch
 Patch3: squid-3.5.9-include-guards.patch
 Patch4: squid-4.0.21-large-acl.patch
 
-Patch6000: CVE-2019-12525.patch
-Patch6001: CVE-2019-12527.patch
-Patch6002: CVE-2019-12529.patch
-Patch6003: CVE-2019-12854.patch
-Patch6004: CVE-2019-13345.patch
-Patch6005: CVE-2019-18677.patch
-Patch6006: eCAP-crash-after-using-MyHost.newRequest.patch
-Patch6007: Fix-netdb-exchange-with-a-TLS-cache_peer.patch
-Patch6008: CVE-2019-12523_CVE-2019-18676.patch
-Patch6009: CVE-2019-12526.patch
-Patch6010: CVE-2019-18678_CVE-2019-18679.patch
-
-Buildroot: %{_tmppath}/squid-4.2-2-root-%(%{__id_u} -n)
+Buildroot: %{_tmppath}/squid-4.9-1-root-%(%{__id_u} -n)
 Requires: bash >= 2.0
 Requires(pre): shadow-utils
 Requires(post): /sbin/chkconfig
@@ -212,6 +200,12 @@ fi
     chgrp squid /var/cache/samba/winbindd_privileged >/dev/null 2>&1 || :
 
 %changelog
+* Tue Jan 14 2020 openEuler Buildteam <buildteam@openeuler.org> - 4.9-1
+- Type:NA
+- ID:NA
+- SUG:NA
+- DESC:Package upgrade
+
 * Fri Dec 20 2019  openEuler Buildteam <buildteam@openeuler.org>- 4.2-4
 - Type:bugfix
 - ID:
