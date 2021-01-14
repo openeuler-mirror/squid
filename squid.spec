@@ -2,7 +2,7 @@
 
 Name:     squid
 Version:  4.9
-Release:  3
+Release:  4
 Summary:  The Squid proxy caching server
 Epoch:    7
 License:  GPLv2+ and (LGPLv2+ and MIT and BSD and Public Domain)
@@ -26,6 +26,7 @@ Patch5: CVE-2019-12528.patch
 Patch6: CVE-2020-8517.patch
 Patch7: CVE-2020-8449_CVE-2020-8450.patch
 Patch8: squid-fix-detection-of-sys-sysctl.h-detection-511.patch
+Patch9: CVE-2019-12519.patch
 
 Buildroot: %{_tmppath}/squid-4.9-1-root-%(%{__id_u} -n)
 Requires: bash >= 2.0
@@ -204,6 +205,12 @@ fi
     chgrp squid /var/cache/samba/winbindd_privileged >/dev/null 2>&1 || :
 
 %changelog
+* Mon Jan 11 2021 openEuler Buildteam <buildteam@openeuler.org> - 4.9-4
+- Type:cves
+- ID:CVE-2019-12519
+- SUG:restart
+- DESC:fix CVE-2019-12519
+
 * Mon Aug 03 2020 gaihuiying <gaihuiying1@huawei.com> - 4.9-3
 - Type:bugfix
 - ID:NA
