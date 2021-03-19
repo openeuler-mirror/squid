@@ -25,14 +25,13 @@ Patch4: squid-4.0.21-large-acl.patch
 Patch5: CVE-2019-12528.patch
 Patch6: CVE-2020-8517.patch
 Patch7: CVE-2020-8449_CVE-2020-8450.patch
-Patch8: squid-fix-detection-of-sys-sysctl.h-detection-511.patch
-Patch9: CVE-2019-12519.patch
-Patch10:CVE-2020-11945.patch
-Patch11:CVE-2020-14058.patch
-Patch12:CVE-2020-15049.patch
-Patch13:CVE-2020-15810.patch
-Patch14:CVE-2020-15811.patch
-Patch15:CVE-2020-24606.patch
+Patch8: CVE-2019-12519.patch
+Patch9:CVE-2020-11945.patch
+Patch10:CVE-2020-14058.patch
+Patch11:CVE-2020-15049.patch
+Patch12:CVE-2020-15810.patch
+Patch13:CVE-2020-15811.patch
+Patch14:CVE-2020-24606.patch
 
 Buildroot: %{_tmppath}/squid-4.9-1-root-%(%{__id_u} -n)
 Requires: bash >= 2.0
