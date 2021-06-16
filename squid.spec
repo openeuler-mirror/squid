@@ -2,7 +2,7 @@
 
 Name:     squid
 Version:  4.9
-Release:  6
+Release:  7
 Summary:  The Squid proxy caching server
 Epoch:    7
 License:  GPLv2+ and (LGPLv2+ and MIT and BSD and Public Domain)
@@ -33,6 +33,12 @@ Patch12:CVE-2020-15810.patch
 Patch13:CVE-2020-15811.patch
 Patch14:CVE-2020-24606.patch
 Patch15:backport-CVE-2020-25097.patch
+Patch16:backport-CVE-2021-28651.patch
+Patch17:backport-0001-CVE-2021-28652.patch
+Patch18:backport-0002-CVE-2021-28652.patch
+Patch19:backport-CVE-2021-28662.patch
+Patch20:backport-CVE-2021-31806-CVE-2021-31808.patch
+Patch21:backport-CVE-2021-33620.patch
 
 Buildroot: %{_tmppath}/squid-4.9-1-root-%(%{__id_u} -n)
 Requires: bash >= 2.0
@@ -211,6 +217,12 @@ fi
     chgrp squid /var/cache/samba/winbindd_privileged >/dev/null 2>&1 || :
 
 %changelog
+* Wed Jun 16 2021 xihaochen<xihaochen@huawei.com> - 4.9-7
+- Type:cves
+- ID:CVE-2021-28651 CVE-2021-28652 CVE-2021-28662 CVE-2021-31806 CVE-2021-31808 CVE-2021-33620
+- SUG:NA
+- DESC:fix CVE-2021-28651 CVE-2021-28652 CVE-2021-28662 CVE-2021-31806 CVE-2021-31808 CVE-2021-33620
+
  Wed Mar 31 2021 gaihuiying <gaihuiying1@huawei.com> - 4.9-6
 - Type:cves
 - ID:NA
