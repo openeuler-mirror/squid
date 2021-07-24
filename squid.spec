@@ -2,7 +2,7 @@
 
 Name:     squid
 Version:  4.9
-Release:  7
+Release:  8
 Summary:  The Squid proxy caching server
 Epoch:    7
 License:  GPLv2+ and (LGPLv2+ and MIT and BSD and Public Domain)
@@ -93,7 +93,13 @@ LDFLAGS="$RPM_LD_FLAGS -pie -Wl,-z,relro -Wl,-z,now -Wl,--warn-shared-textrel"
 make DEFAULT_SWAP_DIR=%{_localstatedir}/spool/squid %{?_smp_mflags}
 
 %check
-make check
+if ! getent passwd squid >/dev/null 2>&1 && [ `id -u` -eq 0 ];then
+  /usr/sbin/useradd -u 23 -d /var/spool/squid -r -s /sbin/nologin squid >/dev/null 2>&1 || exit 1
+  make check
+ /usr/sbin/userdel squid
+else
+  make check
+fi
 	
 %install
 rm -rf $RPM_BUILD_ROOT
@@ -217,6 +223,12 @@ fi
     chgrp squid /var/cache/samba/winbindd_privileged >/dev/null 2>&1 || :
 
 %changelog
+* Fri Jul 23 2021 lijingyuan <lijingyuan3@huawei.com> - 4.9-8
+- Type:bugfix
+- ID:NA
+- SUG:NA
+- DESC:fix squid-conf-tests failed when use 'rpmbuild' command
+
 * Wed Jun 16 2021 xihaochen<xihaochen@huawei.com> - 4.9-7
 - Type:cves
 - ID:CVE-2021-28651 CVE-2021-28652 CVE-2021-28662 CVE-2021-31806 CVE-2021-31808 CVE-2021-33620
