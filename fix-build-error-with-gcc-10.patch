@@ -1,0 +1,28 @@
+From 486660deabfa33375df2c8f053d84d6128a1235f Mon Sep 17 00:00:00 2001
+From: Francesco Chemolli <kinkie@squid-cache.org>
+Date: Sat, 21 Mar 2020 22:18:43 +0000
+Subject: [PATCH] FtpGateway.cc: fix build on gcc-10 [-Werror=class-memaccess]
+ (#573)
+
+Since a1c06c7, tokens initialization is done by FtpLineToken
+constructor, and g++-10 complains about memsetting a nontrivial object:
+
+    clearing an object of non-trivial type [-Werror=class-memaccess]
+---
+ src/clients/FtpGateway.cc | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/src/clients/FtpGateway.cc b/src/clients/FtpGateway.cc
+index 79de14d7889..c0350116727 100644
+--- a/src/clients/FtpGateway.cc
++++ b/src/clients/FtpGateway.cc
+@@ -563,8 +563,6 @@ ftpListParseParts(const char *buf, struct Ftp::GatewayFlags flags)
+ 
+     n_tokens = 0;
+ 
+-    memset(tokens, 0, sizeof(tokens));
+-
+     xbuf = xstrdup(buf);
+ 
+     if (flags.tried_nlst) {
+
