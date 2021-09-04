@@ -2,7 +2,7 @@
 
 Name:     squid
 Version:  4.9
-Release:  10
+Release:  11
 Summary:  The Squid proxy caching server
 Epoch:    7
 License:  GPLv2+ and (LGPLv2+ and MIT and BSD and Public Domain)
@@ -53,6 +53,7 @@ Requires(postun): systemd
 BuildRequires: openldap-devel pam-devel openssl-devel krb5-devel libdb-devel expat-devel
 BuildRequires: libxml2-devel libcap-devel libecap-devel gcc-c++ libtool libtool-ltdl-devel
 BuildRequires: perl-generators pkgconfig(cppunit) autoconf
+BuildRequires: chrpath
 
 %description
 Squid is a high-performance proxy caching server. It handles all requests in a single,
@@ -146,6 +147,11 @@ EOF
 mkdir -p $RPM_BUILD_ROOT/usr/share/snmp/mibs
 mv $RPM_BUILD_ROOT/usr/share/squid/mib.txt $RPM_BUILD_ROOT/usr/share/snmp/mibs/SQUID-MIB.txt
 
+chrpath -d %{buildroot}%{_sbindir}/squid
+
+mkdir -p %{buildroot}/etc/ld.so.conf.d
+echo "%{_libdir}" > %{buildroot}/etc/ld.so.conf.d/%{name}-%{_arch}.conf
+
 %files
 %license COPYING 
 %doc CONTRIBUTORS README ChangeLog QUICKSTART src/squid.conf.documented
@@ -172,6 +178,7 @@ mv $RPM_BUILD_ROOT/usr/share/squid/mib.txt $RPM_BUILD_ROOT/usr/share/snmp/mibs/S
 %config %{_sysconfdir}/squid/cachemgr.conf.default
 %config(noreplace) %{_sysconfdir}/pam.d/squid
 %config(noreplace) %{_sysconfdir}/logrotate.d/squid
+%config(noreplace) /etc/ld.so.conf.d/*
 
 %dir %{_datadir}/squid
 %attr(-,root,root) %{_datadir}/squid/errors
@@ -210,12 +217,14 @@ exit 0
 
 %post
 %systemd_post squid.service
+/sbin/ldconfig
 
 %preun
 %systemd_preun squid.service
 
 %postun
 %systemd_postun_with_restart squid.service
+/sbin/ldconfig
 
 %triggerin -- samba-common
 if ! getent group wbpriv >/dev/null 2>&1 ; then
@@ -225,6 +234,12 @@ fi
     chgrp squid /var/cache/samba/winbindd_privileged >/dev/null 2>&1 || :
 
 %changelog
+* Tue Sep 07 2021 gaihuiying <gaihuiying1@huawei.com> - 4.9-11
+- Type:requirement
+- ID:NA
+- SUG:NA
+- DESC:remove rpath of squid
+
 * Fri Jul 30 2021 gaihuiying <gaihuiying1@huawei.com> - 4.9-10
 - Type:bugfix
 - ID:NA
