@@ -1,0 +1,555 @@
+From acd207af1bf340df75a64e8bc4d1e93caa13bbb2 Mon Sep 17 00:00:00 2001
+From: Amos Jeffries <yadij@users.noreply.github.com>
+Date: Tue, 17 Jul 2018 23:36:31 +0000
+Subject: [PATCH] TrivialDB support (#223)
+
+Allow use of Samba TrivialDB instead of outdated BerkleyDB in
+the session helper.
+
+Require TrivialDB support for use of the time_quota helper.
+libdb v1.85 is no longer supported by distributors and
+upgrading to v5 only to deprecate use does not seem to be
+worthwhile.
+---
+ acinclude/tdb.m4                                  |  49 ++++++++
+ configure.ac                                      |   1 +
+ src/acl/external/session/Makefile.am              |   3 +-
+ src/acl/external/session/ext_session_acl.cc       | 143 ++++++++++++++++++----
+ src/acl/external/session/required.m4              |  26 ++--
+ src/acl/external/time_quota/Makefile.am           |   2 +-
+ src/acl/external/time_quota/ext_time_quota_acl.cc |  93 +++++++-------
+ src/acl/external/time_quota/required.m4           |  13 +-
+ test-suite/buildtests/layer-01-minimal.opts       |   1 +
+ test-suite/buildtests/layer-02-maximus.opts       |   1 +
+ 11 files changed, 253 insertions(+), 86 deletions(-)
+ create mode 100644 acinclude/tdb.m4
+
+diff --git a/acinclude/tdb.m4 b/acinclude/tdb.m4
+new file mode 100644
+index 0000000..20b2b2a
+--- /dev/null
++++ b/acinclude/tdb.m4
+@@ -0,0 +1,49 @@
++## Copyright (C) 1996-2018 The Squid Software Foundation and contributors
++##
++## Squid software is distributed under GPLv2+ license and includes
++## contributions from numerous individuals and organizations.
++## Please see the COPYING and CONTRIBUTORS files for details.
++##
++
++dnl check for --with-tdb option
++AC_DEFUN([SQUID_CHECK_LIBTDB],[
++AC_ARG_WITH(tdb,
++  AS_HELP_STRING([--without-tdb],
++                 [Do not use Samba TrivialDB. Default: auto-detect]), [
++case "$with_tdb" in
++  yes|no|auto)
++    : # Nothing special to do here
++    ;;
++  *)
++    AS_IF([test ! -d "$withval"],
++      AC_MSG_ERROR([--with-tdb path ($with_tdb) does not point to a directory])
++    )
++    LIBTDB_PATH="-L$withval/lib"
++    CPPFLAGS="-I$withval/include $CPPFLAGS"
++  ;;
++esac
++])
++AH_TEMPLATE(USE_TRIVIALDB,[Samba TrivialDB support is available])
++AS_IF([test "x$with_tdb" != "xno"],[
++  SQUID_STATE_SAVE(squid_libtdb_state)
++  LIBS="$LIBS $LIBTDB_PATH"
++  PKG_CHECK_MODULES([LIBTDB],[tdb],[CPPFLAGS="$CPPFLAGS $LIBTDB_CFLAGS"],[:])
++  AC_CHECK_HEADERS([sys/stat.h tdb.h],,,[
++#if HAVE_SYS_STAT_H
++#include <sys/stat.h>
++#endif
++  ])
++  SQUID_STATE_ROLLBACK(squid_libtdb_state) #de-pollute LIBS
++
++  AS_IF([test "x$with_tdb" = "xyes" -a "x$LIBTDB_LIBS" = "x"],
++    AC_MSG_ERROR([Required TrivialDB library not found])
++  )
++  AS_IF([test "x$LIBTDB_LIBS" != "x"],[
++    CXXFLAGS="$LIBTDB_CFLAGS $CXXFLAGS"
++    LIBTDB_LIBS="$LIBTDB_PATH $LIBTDB_LIBS"
++    AC_DEFINE_UNQUOTED(USE_TRIVIALDB, HAVE_TDB_H, [Samba TrivialDB support is available])
++  ],[with_tdb=no])
++])
++AC_MSG_NOTICE([Samba TrivialDB library support: ${with_tdb:=auto} ${LIBTDB_PATH} ${LIBTDB_LIBS}])
++AC_SUBST(LIBTDB_LIBS)
++])
+diff --git a/configure.ac b/configure.ac
+index 1ec245a..c8cd996 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -23,6 +23,7 @@ m4_include([acinclude/os-deps.m4])
+ m4_include([acinclude/krb5.m4])
+ m4_include([acinclude/pam.m4])
+ m4_include([acinclude/pkg.m4])
++m4_include([acinclude/tdb.m4])
+ m4_include([acinclude/lib-checks.m4])
+ m4_include([acinclude/ax_cxx_compile_stdcxx_11.m4])
+ m4_include([acinclude/ax_cxx_0x_types.m4])
+diff --git a/src/acl/external/session/Makefile.am b/src/acl/external/session/Makefile.am
+index e54f22b..7509848 100644
+--- a/src/acl/external/session/Makefile.am
++++ b/src/acl/external/session/Makefile.am
+@@ -14,6 +14,7 @@ ext_session_acl_SOURCES= \
+ 	ext_session_acl.cc
+ ext_session_acl_LDADD = \
+ 	$(COMPAT_LIB) \
+-	-ldb
++	$(LIBBDB_LIBS) \
++	$(LIBTDB_LIBS)
+ 
+ EXTRA_DIST= ext_session_acl.8 required.m4
+diff --git a/src/acl/external/session/ext_session_acl.cc b/src/acl/external/session/ext_session_acl.cc
+index 09a35ca..64ffb60 100644
+--- a/src/acl/external/session/ext_session_acl.cc
++++ b/src/acl/external/session/ext_session_acl.cc
+@@ -43,6 +43,9 @@
+ #endif
+ #include <sys/types.h>
+ #include <sys/stat.h>
++#if HAVE_TDB_H
++#include <tdb.h>
++#endif
+ #if HAVE_UNISTD_H
+ #include <unistd.h>
+ #endif
+@@ -60,8 +63,36 @@ static int fixed_timeout = 0;
+ char *db_path = NULL;
+ const char *program_name;
+ 
++#if USE_BERKLEYDB
+ DB *db = NULL;
+ DB_ENV *db_env = NULL;
++typedef DBT DB_ENTRY;
++
++#elif USE_TRIVIALDB
++TDB_CONTEXT *db = nullptr;
++typedef TDB_DATA DB_ENTRY;
++
++#endif
++
++static void
++shutdown_db()
++{
++    if (db) {
++#if USE_BERKLEYDB
++        db->close(db, 0);
++    }
++    if (db_env) {
++        db_env->close(db_env, 0);
++
++#elif USE_TRIVIALDB
++        if (tdb_close(db) != 0) {
++            fprintf(stderr, "%s| WARNING: error closing session db '%s'\n", program_name, db_path);
++            exit(1);
++        }
++#endif
++    }
++    xfree(db_path);
++}
+ 
+ static void init_db(void)
+ {
+@@ -70,6 +101,7 @@ static void init_db(void)
+     if (db_path) {
+         if (!stat(db_path, &st_buf)) {
+             if (S_ISDIR (st_buf.st_mode)) {
++#if USE_BERKLEYDB
+                 /* If directory then open database environment. This prevents sync problems
+                     between different processes. Otherwise fallback to single file */
+                 db_env_create(&db_env, 0);
+@@ -79,10 +111,16 @@ static void init_db(void)
+                     exit(1);
+                 }
+                 db_create(&db, db_env, 0);
++#elif USE_TRIVIALDB
++                std::string newPath(db_path);
++                newPath.append("session", 7);
++                db_path = xstrdup(newPath.c_str());
++#endif
+             }
+         }
+     }
+ 
++#if USE_BERKLEYDB
+     if (db_env) {
+         if (db->open(db, NULL, "session", NULL, DB_BTREE, DB_CREATE, 0666)) {
+             fprintf(stderr, "FATAL: %s: Failed to open db file '%s' in dir '%s'\n",
+@@ -93,60 +131,121 @@ static void init_db(void)
+     } else {
+         db_create(&db, NULL, 0);
+         if (db->open(db, NULL, db_path, NULL, DB_BTREE, DB_CREATE, 0666)) {
+-            fprintf(stderr, "FATAL: %s: Failed to open session db '%s'\n", program_name, db_path);
+-            exit(1);
++            db = nullptr;
+         }
+     }
++#elif USE_TRIVIALDB
++    db = tdb_open(db_path, 0, TDB_CLEAR_IF_FIRST, O_CREAT|O_DSYNC, 0666);
++#endif
++    if (!db) {
++        fprintf(stderr, "FATAL: %s: Failed to open session db '%s'\n", program_name, db_path);
++        shutdown_db();
++        exit(1);
++    }
+ }
+ 
+-static void shutdown_db(void)
++int session_is_active = 0;
++
++static size_t
++dataSize(DB_ENTRY *data)
+ {
+-    db->close(db, 0);
+-    if (db_env) {
+-        db_env->close(db_env, 0);
+-    }
++#if USE_BERKLEYDB
++    return data->size;
++#elif USE_TRIVIALDB
++    return data->dsize;
++#endif
+ }
+ 
+-int session_is_active = 0;
++static bool
++fetchKey(/*const*/ DB_ENTRY &key, DB_ENTRY *data)
++{
++#if USE_BERKLEYDB
++    return (db->get(db, nullptr, &key, data, 0) == 0);
++#elif USE_TRIVIALDB
++    // NP: API says returns NULL on errors, but return is a struct type WTF??
++    *data = tdb_fetch(db, key);
++    return (data->dptr != nullptr);
++#endif
++}
++
++static void
++deleteEntry(/*const*/ DB_ENTRY &key)
++{
++#if USE_BERKLEYDB
++    db->del(db, nullptr, &key, 0);
++#elif USE_TRIVIALDB
++    tdb_delete(db, key);
++#endif
++}
++
++static void
++copyValue(void *dst, const DB_ENTRY *src, size_t sz)
++{
++#if USE_BERKLEYDB
++    memcpy(dst, src->data, sz);
++#elif USE_TRIVIALDB
++    memcpy(dst, src->dptr, sz);
++#endif
++}
+ 
+ static int session_active(const char *details, size_t len)
+ {
++#if USE_BERKLEYDB
+     DBT key = {0};
+     DBT data = {0};
+     key.data = (void *)details;
+     key.size = len;
+-    if (db->get(db, NULL, &key, &data, 0) == 0) {
++#elif USE_TRIVIALDB
++    TDB_DATA key;
++    TDB_DATA data;
++#endif
++    if (fetchKey(key, &data)) {
+         time_t timestamp;
+-        if (data.size != sizeof(timestamp)) {
++        if (dataSize(&data) != sizeof(timestamp)) {
+             fprintf(stderr, "ERROR: %s: CORRUPTED DATABASE (%s)\n", program_name, details);
+-            db->del(db, NULL, &key, 0);
++            deleteEntry(key);
+             return 0;
+         }
+-        memcpy(&timestamp, data.data, sizeof(timestamp));
++        copyValue(&timestamp, &data, sizeof(timestamp));
+         if (timestamp + session_ttl >= time(NULL))
+             return 1;
+     }
+     return 0;
+ }
+ 
+-static void session_login(const char *details, size_t len)
++static void
++session_login(/*const*/ char *details, size_t len)
+ {
+-    DBT key = {0};
+-    DBT data = {0};
+-    key.data = (void *)details;
++    DB_ENTRY key = {0};
++    DB_ENTRY data = {0};
++    time_t now = time(0);
++#if USE_BERKLEYDB
++    key.data = static_cast<decltype(key.data)>(details);
+     key.size = len;
+-    time_t now = time(NULL);
+     data.data = &now;
+     data.size = sizeof(now);
+     db->put(db, NULL, &key, &data, 0);
++#elif USE_TRIVIALDB
++    key.dptr = reinterpret_cast<decltype(key.dptr)>(details);
++    key.dsize = len;
++    data.dptr = reinterpret_cast<decltype(data.dptr)>(&now);
++    data.dsize = sizeof(now);
++    tdb_store(db, key, data, 0);
++#endif
+ }
+ 
+-static void session_logout(const char *details, size_t len)
++static void
++session_logout(/*const*/ char *details, size_t len)
+ {
+-    DBT key = {0};
+-    key.data = (void *)details;
++    DB_ENTRY key = {0};
++#if USE_BERKLEYDB
++    key.data = static_cast<decltype(key.data)>(details);
+     key.size = len;
+-    db->del(db, NULL, &key, 0);
++#elif USE_TRIVIALDB
++    key.dptr = reinterpret_cast<decltype(key.dptr)>(details);
++    key.dsize = len;
++#endif
++    deleteEntry(key);
+ }
+ 
+ static void usage(void)
+@@ -173,7 +272,7 @@ int main(int argc, char **argv)
+             session_ttl = strtol(optarg, NULL, 0);
+             break;
+         case 'b':
+-            db_path = optarg;
++            db_path = xstrdup(optarg);
+             break;
+         case 'a':
+             default_action = 0;
+diff --git a/src/acl/external/session/required.m4 b/src/acl/external/session/required.m4
+index 229774b..1fe8a0e 100755
+--- a/src/acl/external/session/required.m4
++++ b/src/acl/external/session/required.m4
+@@ -5,11 +5,23 @@
+ ## Please see the COPYING and CONTRIBUTORS files for details.
+ ##
+ 
+-AC_CHECK_HEADERS(db.h,[
+-  AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <db.h>]],[[
+-    DB_ENV *db_env = nullptr;
+-    db_env_create(&db_env, 0);
+-  ]])],[
++SQUID_CHECK_LIBTDB
++if test "$with_tdb" != "no"; then
+     BUILD_HELPER="session"
+-  ],[])
+-])
++fi
++
++LIBBDB_LIBS=
++AH_TEMPLATE(USE_BERKLEYDB,[BerkleyDB support is available])
++if test "x$with_tdb" = "xno"; then
++  AC_CHECK_HEADERS(db.h,[
++    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <db.h>]],[[
++      DB_ENV *db_env = nullptr;
++      db_env_create(&db_env, 0);
++    ]])],[
++      AC_DEFINE_UNQUOTED(USE_BERKLEYDB, HAVE_DB_H, [BerkleyDB support is available])
++      BUILD_HELPER="session"
++      LIBBDB_LIBS="-ldb"
++    ],[])
++  ])
++fi
++AC_SUBST(LIBBDB_LIBS)
+diff --git a/src/acl/external/time_quota/Makefile.am b/src/acl/external/time_quota/Makefile.am
+index 4684637..20eba22 100644
+--- a/src/acl/external/time_quota/Makefile.am
++++ b/src/acl/external/time_quota/Makefile.am
+@@ -16,6 +16,6 @@ ext_time_quota_acl_SOURCES= \
+ 	ext_time_quota_acl.cc
+ ext_time_quota_acl_LDADD = \
+ 	$(COMPAT_LIB) \
+-	-ldb
++	$(LIBTDB_LIBS)
+ 
+ EXTRA_DIST= ext_time_quota_acl.8 required.m4
+diff --git a/src/acl/external/time_quota/ext_time_quota_acl.cc b/src/acl/external/time_quota/ext_time_quota_acl.cc
+index 764fa86..8f1bbef 100644
+--- a/src/acl/external/time_quota/ext_time_quota_acl.cc
++++ b/src/acl/external/time_quota/ext_time_quota_acl.cc
+@@ -41,19 +41,8 @@
+ #if HAVE_GETOPT_H
+ #include <getopt.h>
+ #endif
+-
+-/* At this point all Bit Types are already defined, so we must
+-   protect from multiple type definition on platform where
+-   __BIT_TYPES_DEFINED__ is not defined.
+- */
+-#ifndef        __BIT_TYPES_DEFINED__
+-#define        __BIT_TYPES_DEFINED__
+-#endif
+-
+-#if HAVE_DB_185_H
+-#include <db_185.h>
+-#elif HAVE_DB_H
+-#include <db.h>
++#if HAVE_TDB_H
++#include <tdb.h>
+ #endif
+ 
+ #ifndef DEFAULT_QUOTA_DB
+@@ -63,7 +52,7 @@
+ const char *db_path = DEFAULT_QUOTA_DB;
+ const char *program_name;
+ 
+-DB *db = NULL;
++TDB_CONTEXT *db = nullptr;
+ 
+ #define KEY_LAST_ACTIVITY            "last-activity"
+ #define KEY_PERIOD_START             "period-start"
+@@ -147,7 +136,7 @@ static void log_fatal(const char *format, ...)
+ static void init_db(void)
+ {
+     log_info("opening time quota database \"%s\".\n", db_path);
+-    db = dbopen(db_path, O_CREAT | O_RDWR, 0666, DB_BTREE, NULL);
++    db = tdb_open(db_path, 0, TDB_CLEAR_IF_FIRST, O_CREAT | O_RDWR, 0666);
+     if (!db) {
+         log_fatal("Failed to open time_quota db '%s'\n", db_path);
+         exit(1);
+@@ -156,52 +145,68 @@ static void init_db(void)
+ 
+ static void shutdown_db(void)
+ {
+-    db->close(db);
++    tdb_close(db);
+ }
+ 
+-static void writeTime(const char *user_key, const char *sub_key, time_t t)
++static char *KeyString(int &len, const char *user_key, const char *sub_key)
+ {
+-    char keybuffer[TQ_BUFFERSIZE];
+-    DBT key, data;
++    static char keybuffer[TQ_BUFFERSIZE];
++    *keybuffer = 0;
++
++    len = snprintf(keybuffer, sizeof(keybuffer), "%s-%s", user_key, sub_key);
++    if (len < 0) {
++        log_error("Cannot add entry: %s-%s", user_key, sub_key);
++        len = 0;
+ 
+-    if ( strlen(user_key) + strlen(sub_key) + 1 + 1 > sizeof(keybuffer) ) {
++    } else if (static_cast<size_t>(len) >= sizeof(keybuffer)) {
+         log_error("key too long (%s,%s)\n", user_key, sub_key);
+-    } else {
+-        snprintf(keybuffer, sizeof(keybuffer), "%s-%s", user_key, sub_key);
++        len = 0;
++    }
++
++    return keybuffer;
++}
++
++static void writeTime(const char *user_key, const char *sub_key, time_t t)
++{
++    int len = 0;
++    if (/* const */ char *keybuffer = KeyString(len, user_key, sub_key)) {
++
++        TDB_DATA key, data;
++
++        key.dptr = reinterpret_cast<unsigned char *>(keybuffer);
++        key.dsize = len;
+ 
+-        key.data = (void *)keybuffer;
+-        key.size = strlen(keybuffer);
+-        data.data = &t;
+-        data.size = sizeof(t);
+-        db->put(db, &key, &data, 0);
++        data.dptr = reinterpret_cast<unsigned char *>(&t);
++        data.dsize = sizeof(t);
++
++        tdb_store(db, key, data, TDB_REPLACE);
+         log_debug("writeTime(\"%s\", %d)\n", keybuffer, t);
+     }
+ }
+ 
+ static time_t readTime(const char *user_key, const char *sub_key)
+ {
+-    char keybuffer[TQ_BUFFERSIZE];
+-    DBT key, data;
+-    time_t t = 0;
++    int len = 0;
++    if (/* const */ char *keybuffer = KeyString(len, user_key, sub_key)) {
+ 
+-    if ( strlen(user_key) + 1 + strlen(sub_key) + 1 > sizeof(keybuffer) ) {
+-        log_error("key too long (%s,%s)\n", user_key, sub_key);
+-    } else {
+-        snprintf(keybuffer, sizeof(keybuffer), "%s-%s", user_key, sub_key);
++        TDB_DATA key;
++        key.dptr = reinterpret_cast<unsigned char *>(keybuffer);
++        key.dsize = len;
+ 
+-        key.data = (void *)keybuffer;
+-        key.size = strlen(keybuffer);
+-        if (db->get(db, &key, &data, 0) == 0) {
+-            if (data.size != sizeof(t)) {
+-                log_error("CORRUPTED DATABASE (%s)\n", keybuffer);
+-            } else {
+-                memcpy(&t, data.data, sizeof(t));
+-            }
++        auto data = tdb_fetch(db, key);
++
++        time_t t = 0;
++        if (data.dsize != sizeof(t)) {
++            log_error("CORRUPTED DATABASE (%s)\n", keybuffer);
++        } else {
++            memcpy(&t, data.dptr, sizeof(t));
+         }
++
+         log_debug("readTime(\"%s\")=%d\n", keybuffer, t);
++        return t;
+     }
+ 
+-    return t;
++    return 0;
+ }
+ 
+ static void parseTime(const char *s, time_t *secs, time_t *start)
+@@ -388,8 +393,6 @@ static void processActivity(const char *user_key)
+         log_debug("ERR %s\n", message);
+         SEND_ERR("Time budget exceeded.");
+     }
+-
+-    db->sync(db, 0);
+ }
+ 
+ static void usage(void)
+diff --git a/src/acl/external/time_quota/required.m4 b/src/acl/external/time_quota/required.m4
+index a54daae..c9e52bf 100644
+--- a/src/acl/external/time_quota/required.m4
++++ b/src/acl/external/time_quota/required.m4
+@@ -5,12 +5,7 @@
+ ## Please see the COPYING and CONTRIBUTORS files for details.
+ ##
+ 
+-AC_CHECK_HEADERS(db_185.h,[BUILD_HELPER="time_quota"],[
+-  AC_CHECK_HEADERS(db.h,[
+-    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <db.h>]],[[
+-      DB *db = dbopen("/tmp", O_CREAT | O_RDWR, 0666, DB_BTREE, NULL);
+-    ]])],[
+-      BUILD_HELPER="time_quota"
+-    ],[])
+-  ])
+-])
++SQUID_CHECK_LIBTDB
++if test "$with_tdb" != "no"; then
++    BUILD_HELPER="time_quota"
++fi
+-- 
+1.8.3.1
+
