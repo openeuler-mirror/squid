@@ -2,7 +2,7 @@
 
 Name:     squid
 Version:  4.9
-Release:  11
+Release:  12
 Summary:  The Squid proxy caching server
 Epoch:    7
 License:  GPLv2+ and (LGPLv2+ and MIT and BSD and Public Domain)
@@ -41,6 +41,7 @@ Patch20:backport-CVE-2021-28662.patch
 Patch21:backport-CVE-2021-31806-CVE-2021-31808.patch
 Patch22:backport-CVE-2021-33620.patch
 Patch23:fix-build-error-with-gcc-10.patch
+Patch24:squid-add-TrivialDB-support-223.patch
 
 Buildroot: %{_tmppath}/squid-4.9-1-root-%(%{__id_u} -n)
 Requires: bash >= 2.0
@@ -50,7 +51,7 @@ Requires(preun): /sbin/chkconfig
 Requires(post): systemd
 Requires(preun): systemd
 Requires(postun): systemd
-BuildRequires: openldap-devel pam-devel openssl-devel krb5-devel libdb-devel expat-devel
+BuildRequires: openldap-devel pam-devel openssl-devel krb5-devel libtdb-devel expat-devel
 BuildRequires: libxml2-devel libcap-devel libecap-devel gcc-c++ libtool libtool-ltdl-devel
 BuildRequires: perl-generators pkgconfig(cppunit) autoconf
 BuildRequires: chrpath
@@ -63,8 +64,8 @@ non-blocking, I/O-driven process and keeps meta data and implements negative cac
 %autosetup -p1
 
 %build
-autoconf
-
+autoreconf
+automake
 CXXFLAGS="$RPM_OPT_FLAGS -fPIC"
 CFLAGS="$RPM_OPT_FLAGS -fPIC"
 LDFLAGS="$RPM_LD_FLAGS -pie -Wl,-z,relro -Wl,-z,now -Wl,--warn-shared-textrel"
@@ -91,7 +92,8 @@ LDFLAGS="$RPM_LD_FLAGS -pie -Wl,-z,relro -Wl,-z,now -Wl,--warn-shared-textrel"
    --enable-storeio="aufs,diskd,ufs,rock" --enable-diskio --enable-wccpv2 \
    --enable-esi --enable-ecap --with-aio --with-default-user="squid" \
    --with-dl --with-openssl --with-pthreads --disable-arch-native \
-   --with-pic --disable-security-cert-validators
+   --with-pic --disable-security-cert-validators \
+   --with-tdb
 
 make DEFAULT_SWAP_DIR=%{_localstatedir}/spool/squid %{?_smp_mflags}
 
@@ -234,6 +236,12 @@ fi
     chgrp squid /var/cache/samba/winbindd_privileged >/dev/null 2>&1 || :
 
 %changelog
+* Wed Feb 23 2022 xihaochen <xihaochen@h-partner.com> - 4.9-12
+- Type:requirement
+- ID:NA
+- SUG:NA
+- DESC:use libtdb instead of libdb
+
 * Tue Sep 07 2021 gaihuiying <gaihuiying1@huawei.com> - 4.9-11
 - Type:requirement
 - ID:NA
