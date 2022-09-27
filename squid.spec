@@ -2,7 +2,7 @@
 
 Name:     squid
 Version:  4.9
-Release:  12
+Release:  13
 Summary:  The Squid proxy caching server
 Epoch:    7
 License:  GPLv2+ and (LGPLv2+ and MIT and BSD and Public Domain)
@@ -42,6 +42,7 @@ Patch21:backport-CVE-2021-33620.patch
 Patch22:backport-CVE-2021-28116.patch
 Patch23:backport-CVE-2021-46784.patch
 Patch24:backport-CVE-2022-41317.patch
+Patch25:backport-CVE-2022-41318.patch
 
 Buildroot: %{_tmppath}/squid-4.9-1-root-%(%{__id_u} -n)
 Requires: bash >= 2.0
@@ -226,6 +227,12 @@ fi
     chgrp squid /var/cache/samba/winbindd_privileged >/dev/null 2>&1 || :
 
 %changelog
+* Tue Sep 27 2022 gaihuiying <eaglegai@163.com> - 7:4.9-13
+- Type:cves
+- ID:CVE-2022-41318
+- SUG:NA
+- DESC:fix CVE-2022-41318
+
 * Sat Sep 24 2022 gaihuiying <eaglegai@163.com> - 7:4.9-12
 - Type:cves
 - ID:CVE-2022-41317
