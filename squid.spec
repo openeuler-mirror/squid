@@ -2,7 +2,7 @@
 
 Name:     squid
 Version:  4.9
-Release:  16
+Release:  17
 Summary:  The Squid proxy caching server
 Epoch:    7
 License:  GPLv2+ and (LGPLv2+ and MIT and BSD and Public Domain)
@@ -68,7 +68,7 @@ non-blocking, I/O-driven process and keeps meta data and implements negative cac
 %autosetup -p1
 
 %build
-autoreconf
+autoreconf -fi
 automake
 CXXFLAGS="$RPM_OPT_FLAGS -fPIC"
 CFLAGS="$RPM_OPT_FLAGS -fPIC"
@@ -240,6 +240,12 @@ fi
     chgrp squid /var/cache/samba/winbindd_privileged >/dev/null 2>&1 || :
 
 %changelog
+* Fri Nov 11 2022 xinghe <xinghe2@h-partners.com> - 7:4.9-17
+- Type:bugfix
+- ID:NA
+- SUG:NA
+- DESC:fix build failed
+
 * Tue Sep 27 2022 gaihuiying <eaglegai@163.com> - 7:4.9-16
 - Type:cves
 - ID:CVE-2022-41318
