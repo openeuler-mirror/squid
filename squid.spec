@@ -1,64 +1,37 @@
 %define __perl_requires %{SOURCE8}
 
 Name:     squid
-Version:  4.9
-Release:  17
+Version:  5.7
+Release:  1
 Summary:  The Squid proxy caching server
 Epoch:    7
 License:  GPLv2+ and (LGPLv2+ and MIT and BSD and Public Domain)
 URL:      http://www.squid-cache.org
-Source0:  http://www.squid-cache.org/Versions/v4/squid-4.9.tar.xz
-Source1:  http://www.squid-cache.org/Versions/v4/squid-4.9.tar.xz.asc
+Source0:  http://www.squid-cache.org/Versions/v5/squid-%{version}.tar.xz
+Source1:  http://www.squid-cache.org/Versions/v5/squid-%{version}.tar.xz.asc
 Source2:  squid.logrotate
 Source3:  squid.sysconfig
 Source4:  squid.pam
 Source5:  squid.nm
 Source6:  squid.service
 Source7:  cache_swap.sh
-Source8: perl-requires-squid.sh
+Source8:  perl-requires-squid.sh
 
-Patch0: squid-4.0.11-config.patch
-Patch1: squid-3.1.0.9-location.patch
-Patch2: squid-3.0.STABLE1-perlpath.patch
-Patch3: squid-3.5.9-include-guards.patch
-Patch4: squid-4.0.21-large-acl.patch
-Patch5: CVE-2019-12528.patch
-Patch6: CVE-2020-8517.patch
-Patch7: CVE-2020-8449_CVE-2020-8450.patch
-Patch8: squid-fix-detection-of-sys-sysctl.h-detection-511.patch
-Patch9: CVE-2019-12519.patch
-Patch10:CVE-2020-11945.patch
-Patch11:CVE-2020-14058.patch
-Patch12:CVE-2020-15049.patch
-Patch13:CVE-2020-15810.patch
-Patch14:CVE-2020-15811.patch
-Patch15:CVE-2020-24606.patch
-Patch16:backport-CVE-2020-25097.patch
-Patch17:backport-CVE-2021-28651.patch
-Patch18:backport-0001-CVE-2021-28652.patch
-Patch19:backport-0002-CVE-2021-28652.patch
-Patch20:backport-CVE-2021-28662.patch
-Patch21:backport-CVE-2021-31806-CVE-2021-31808.patch
-Patch22:backport-CVE-2021-33620.patch
-Patch23:fix-build-error-with-gcc-10.patch
-Patch24:squid-add-TrivialDB-support-223.patch
-Patch25:backport-CVE-2021-28116.patch
-Patch26:backport-CVE-2021-46784.patch
-Patch27:backport-CVE-2022-41317.patch
-Patch28:backport-CVE-2022-41318.patch
+Patch0:   squid-4.0.11-config.patch
+Patch1:   squid-3.1.0.9-location.patch
+Patch2:   squid-3.0.STABLE1-perlpath.patch
+Patch3:   squid-3.5.9-include-guards.patch
 
-Buildroot: %{_tmppath}/squid-4.9-1-root-%(%{__id_u} -n)
-Requires: bash >= 2.0
-Requires(pre): shadow-utils
-Requires(post): /sbin/chkconfig
-Requires(preun): /sbin/chkconfig
-Requires(post): systemd
-Requires(preun): systemd
-Requires(postun): systemd
+Requires: bash
+Requires: httpd-filesystem
 BuildRequires: openldap-devel pam-devel openssl-devel krb5-devel libtdb-devel expat-devel
 BuildRequires: libxml2-devel libcap-devel libecap-devel gcc-c++ libtool libtool-ltdl-devel
-BuildRequires: perl-generators pkgconfig(cppunit) autoconf
-BuildRequires: chrpath
+BuildRequires: perl-generators pkgconfig(cppunit)
+BuildRequires: chrpath systemd-devel
+
+%systemd_requires
+
+Conflicts: NetworkManager < 1.20
 
 %description
 Squid is a high-performance proxy caching server. It handles all requests in a single,
@@ -67,18 +40,13 @@ non-blocking, I/O-driven process and keeps meta data and implements negative cac
 %prep
 %autosetup -p1
 
-%build
-autoreconf -fi
-automake
-CXXFLAGS="$RPM_OPT_FLAGS -fPIC"
-CFLAGS="$RPM_OPT_FLAGS -fPIC"
-LDFLAGS="$RPM_LD_FLAGS -pie -Wl,-z,relro -Wl,-z,now -Wl,--warn-shared-textrel"
+sed -i 's|@SYSCONFDIR@/squid.conf.documented|%{_pkgdocdir}/squid.conf.documented|' src/squid.8.in
 
+%build
 %configure \
-   --exec_prefix=%{_prefix} --libexecdir=%{_libdir}/squid \
-   --localstatedir=%{_localstatedir} --datadir=%{_datadir}/squid \
+   --libexecdir=%{_libdir}/squid --datadir=%{_datadir}/squid \
    --sysconfdir=%{_sysconfdir}/squid  --with-logdir='%{_localstatedir}/log/squid' \
-   --with-pidfile='%{_localstatedir}/run/squid.pid' \
+   --with-pidfile='/run/squid.pid' \
    --disable-dependency-tracking --enable-eui \
    --enable-follow-x-forwarded-for --enable-auth \
    --enable-auth-basic="DB,fake,getpwnam,LDAP,NCSA,PAM,POP3,RADIUS,SASL,SMB,SMB_LM" \
@@ -96,10 +64,15 @@ LDFLAGS="$RPM_LD_FLAGS -pie -Wl,-z,relro -Wl,-z,now -Wl,--warn-shared-textrel"
    --enable-storeio="aufs,diskd,ufs,rock" --enable-diskio --enable-wccpv2 \
    --enable-esi --enable-ecap --with-aio --with-default-user="squid" \
    --with-dl --with-openssl --with-pthreads --disable-arch-native \
-   --with-pic --disable-security-cert-validators \
-   --with-tdb
+   --disable-security-cert-validators \
+   --with-tdb --disable-strict-error-checking \
+   --with-swapdir=%{_localstatedir}/spool/squid
 
-make DEFAULT_SWAP_DIR=%{_localstatedir}/spool/squid %{?_smp_mflags}
+mkdir -p src/icmp/tests
+mkdir -p tools/squidclient/tests
+mkdir -p tools/tests
+
+%make_build
 
 %check
 if ! getent passwd squid >/dev/null 2>&1 && [ `id -u` -eq 0 ];then
@@ -111,8 +84,7 @@ else
 fi
 
 %install
-rm -rf $RPM_BUILD_ROOT
-make DESTDIR=$RPM_BUILD_ROOT install
+%make_install
 echo "
 #
 # This is %{_sysconfdir}/httpd/conf.d/squid.conf
@@ -129,20 +101,18 @@ ScriptAlias /Squid/cgi-bin/cachemgr.cgi %{_libdir}/squid/cachemgr.cgi
 
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig \
          $RPM_BUILD_ROOT%{_sysconfdir}/pam.d $RPM_BUILD_ROOT%{_sysconfdir}/httpd/conf.d/ \
-         $RPM_BUILD_ROOT%{_sysconfdir}/NetworkManager/dispatcher.d $RPM_BUILD_ROOT%{_unitdir} \
-         $RPM_BUILD_ROOT%{_libexecdir}/squid $RPM_BUILD_ROOT%{_sysconfdir}/rc.d/init.d
+         $RPM_BUILD_ROOT%{_prefix}/lib/NetworkManager/dispatcher.d $RPM_BUILD_ROOT%{_unitdir} \
+         $RPM_BUILD_ROOT%{_libexecdir}/squid
 install -m 644 %{SOURCE2} $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/squid
 install -m 644 %{SOURCE3} $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig/squid
 install -m 644 %{SOURCE4} $RPM_BUILD_ROOT%{_sysconfdir}/pam.d/squid
 install -m 644 %{SOURCE6} $RPM_BUILD_ROOT%{_unitdir}
 install -m 755 %{SOURCE7} $RPM_BUILD_ROOT%{_libexecdir}/squid
 install -m 644 $RPM_BUILD_ROOT/squid.httpd.tmp $RPM_BUILD_ROOT%{_sysconfdir}/httpd/conf.d/squid.conf
-install -m 644 %{SOURCE5} $RPM_BUILD_ROOT%{_sysconfdir}/NetworkManager/dispatcher.d/20-squid
+install -m 755 %{SOURCE5} $RPM_BUILD_ROOT%{_prefix}/lib/NetworkManager/dispatcher.d/20-squid
 mkdir -p $RPM_BUILD_ROOT%{_localstatedir}/log/squid $RPM_BUILD_ROOT%{_localstatedir}/spool/squid \
-         $RPM_BUILD_ROOT%{_localstatedir}/run/squid
+         $RPM_BUILD_ROOT/run/squid
 chmod 644 contrib/url-normalizer.pl contrib/user-agents.pl
-iconv -f ISO88591 -t UTF8 ChangeLog -o ChangeLog.tmp
-mv -f ChangeLog.tmp ChangeLog
 
 mkdir -p ${RPM_BUILD_ROOT}%{_tmpfilesdir}
 cat > ${RPM_BUILD_ROOT}%{_tmpfilesdir}/squid.conf <<EOF
@@ -170,7 +140,7 @@ echo "%{_libdir}" > %{buildroot}/etc/ld.so.conf.d/%{name}-%{_arch}.conf
 %attr(755,root,root) %dir %{_libdir}/squid
 %attr(770,squid,root) %dir %{_localstatedir}/log/squid
 %attr(750,squid,squid) %dir %{_localstatedir}/spool/squid
-%attr(755,squid,squid) %dir %{_localstatedir}/run/squid
+%attr(755,squid,squid) %dir /run/squid
 
 %config(noreplace) %attr(644,root,root) %{_sysconfdir}/httpd/conf.d/squid.conf
 %config(noreplace) %attr(640,root,squid) %{_sysconfdir}/squid/squid.conf
@@ -188,7 +158,7 @@ echo "%{_libdir}" > %{buildroot}/etc/ld.so.conf.d/%{name}-%{_arch}.conf
 
 %dir %{_datadir}/squid
 %attr(-,root,root) %{_datadir}/squid/errors
-%attr(755,root,root) %{_sysconfdir}/NetworkManager/dispatcher.d/20-squid
+%{_prefix}/lib/NetworkManager
 %{_datadir}/squid/icons
 %{_sbindir}/squid
 %{_bindir}/squidclient
@@ -221,6 +191,37 @@ done
 
 exit 0
 
+%pretrans -p <lua>
+-- temporarilly commented until https://bugzilla.redhat.com/show_bug.cgi?id=1936422 is resolved
+-- previously /usr/share/squid/errors/es-mx was symlink, now it is directory since squid v5
+-- see https://docs.fedoraproject.org/en-US/packaging-guidelines/Directory_Replacement/
+-- Define the path to the symlink being replaced below.
+--
+-- path = "/usr/share/squid/errors/es-mx"
+-- st = posix.stat(path)
+-- if st and st.type == "link" then
+--   os.remove(path)
+-- end
+
+-- Due to a bug #447156
+paths = {"/usr/share/squid/errors/zh-cn", "/usr/share/squid/errors/zh-tw"}
+for key,path in ipairs(paths)
+do
+  st = posix.stat(path)
+  if st and st.type == "directory" then
+    status = os.rename(path, path .. ".rpmmoved")
+    if not status then
+      suffix = 0
+      while not status do
+        suffix = suffix + 1
+        status = os.rename(path .. ".rpmmoved", path .. ".rpmmoved." .. suffix)
+      end
+      os.rename(path, path .. ".rpmmoved")
+    end
+  end
+end
+
+
 %post
 %systemd_post squid.service
 /sbin/ldconfig
@@ -240,6 +241,12 @@ fi
     chgrp squid /var/cache/samba/winbindd_privileged >/dev/null 2>&1 || :
 
 %changelog
+* Mon Nov 14 2022 xinghe <xinghe2@h-partners.com> - 7:5.7-1
+- Type:requirements
+- ID:NA
+- SUG:NA
+- DESC:upgrade to 5.7
+
 * Fri Nov 11 2022 xinghe <xinghe2@h-partners.com> - 7:4.9-17
 - Type:bugfix
 - ID:NA

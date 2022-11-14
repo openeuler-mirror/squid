@@ -2,6 +2,6 @@
 
 case "$2" in
         up|down|vpn-up|vpn-down)
-                /bin/systemctl -q reload squid.service || :
+                /usr/bin/systemctl -q reload squid.service || :
                 ;;
 esac
