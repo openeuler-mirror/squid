@@ -2,7 +2,7 @@
 
 Name:     squid
 Version:  5.7
-Release:  1
+Release:  2
 Summary:  The Squid proxy caching server
 Epoch:    7
 License:  GPLv2+ and (LGPLv2+ and MIT and BSD and Public Domain)
@@ -27,7 +27,7 @@ Requires: httpd-filesystem
 BuildRequires: openldap-devel pam-devel openssl-devel krb5-devel libtdb-devel expat-devel
 BuildRequires: libxml2-devel libcap-devel libecap-devel gcc-c++ libtool libtool-ltdl-devel
 BuildRequires: perl-generators pkgconfig(cppunit)
-BuildRequires: chrpath systemd-devel
+BuildRequires: chrpath systemd-devel libatomic
 
 %systemd_requires
 
@@ -241,6 +241,12 @@ fi
     chgrp squid /var/cache/samba/winbindd_privileged >/dev/null 2>&1 || :
 
 %changelog
+* Wed Jul 19 2023 yoo <sunyuechi@iscas.ac.cn> - 7:5.7-2
+- Type:requirements
+- ID:NA
+- SUG:NA
+- DESC:fix clang build error
+
 * Mon Nov 14 2022 xinghe <xinghe2@h-partners.com> - 7:5.7-1
 - Type:requirements
 - ID:NA
